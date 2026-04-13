@@ -1,0 +1,4 @@
+output/*.png
+output/*.svg
+__pycache__/
+*.pyc

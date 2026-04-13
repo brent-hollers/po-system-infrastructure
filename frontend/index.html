@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>St. Mary's Academy — Purchase Order Request</title>
+
+  <!-- Google Identity Services -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <style>
+    /* ── Reset & base ───────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 14px;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Header bar ─────────────────────────────────────────────── */
+    .site-header {
+      background: #1a2e5a;
+      color: #fff;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.25);
+    }
+    .site-header .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: .3px;
+    }
+    .site-header .brand span.accent { color: #f5c518; }
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .user-info img { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #f5c518; }
+    .btn-signout {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.5);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-signout:hover { background: rgba(255,255,255,.1); }
+
+    /* ── Sign-in wall ───────────────────────────────────────────── */
+    #sign-in-wall {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 60px);
+      gap: 20px;
+    }
+    #sign-in-wall .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.1);
+      padding: 48px 40px;
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    #sign-in-wall h2 { color: #1a2e5a; font-size: 20px; margin-bottom: 8px; }
+    #sign-in-wall p { color: #666; margin-bottom: 28px; font-size: 13px; }
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 6px;
+      color: #991b1b;
+      padding: 10px 14px;
+      font-size: 13px;
+      display: none;
+    }
+
+    /* ── Main app ───────────────────────────────────────────────── */
+    #app { display: none; max-width: 960px; margin: 28px auto; padding: 0 16px 48px; }
+
+    /* ── Card ───────────────────────────────────────────────────── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,.07);
+      margin-bottom: 20px;
+    }
+    .card-header {
+      background: #1a2e5a;
+      color: #fff;
+      border-radius: 10px 10px 0 0;
+      padding: 12px 20px;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+    }
+    .card-body { padding: 20px; }
+
+    /* ── Form title ─────────────────────────────────────────────── */
+    .form-title {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .form-title h1 { font-size: 22px; color: #1a2e5a; margin-bottom: 4px; }
+    .form-title p { font-size: 13px; color: #666; }
+
+    /* ── Grid layouts ───────────────────────────────────────────── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; }
+    .col-span-2 { grid-column: span 2; }
+    .col-span-3 { grid-column: span 3; }
+
+    @media (max-width: 640px) {
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+      .col-span-2, .col-span-3 { grid-column: span 1; }
+    }
+
+    /* ── Form fields ────────────────────────────────────────────── */
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    .field label .req { color: #dc2626; }
+    .field input, .field select, .field textarea {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      color: #1a1a2e;
+      background: #fff;
+      transition: border-color .15s;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus {
+      outline: none;
+      border-color: #1a2e5a;
+      box-shadow: 0 0 0 3px rgba(26,46,90,.08);
+    }
+    .field input[readonly] { background: #f9fafb; color: #6b7280; }
+    .field textarea { resize: vertical; min-height: 70px; }
+
+    /* ── Personal funds toggle ──────────────────────────────────── */
+    .personal-funds-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 16px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 8px;
+      margin-bottom: 4px;
+    }
+    .personal-funds-row input[type=checkbox] {
+      width: 18px; height: 18px; accent-color: #1a2e5a; cursor: pointer; flex-shrink: 0;
+    }
+    .personal-funds-row label { font-size: 13px; color: #92400e; cursor: pointer; line-height: 1.4; }
+    .personal-funds-row label strong { display: block; font-size: 14px; color: #78350f; }
+
+    /* ── Line items ─────────────────────────────────────────────── */
+    .items-table-wrap { overflow-x: auto; }
+    table.items {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 700px;
+    }
+    table.items th {
+      background: #f3f4f6;
+      color: #374151;
+      font-weight: 600;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+      padding: 8px 6px;
+      text-align: left;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    table.items th.num { text-align: center; width: 32px; }
+    table.items th.qty { width: 60px; }
+    table.items th.itemno { width: 90px; }
+    table.items th.uprice { width: 90px; }
+    table.items th.eprice { width: 90px; }
+    table.items th.remove { width: 36px; }
+
+    table.items td { padding: 5px 4px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+    table.items td.num { text-align: center; color: #9ca3af; font-size: 12px; }
+    table.items td input {
+      width: 100%;
+      border: 1px solid #e5e7eb;
+      border-radius: 5px;
+      padding: 6px 7px;
+      font-size: 13px;
+      color: #1a1a2e;
+    }
+    table.items td input:focus { outline: none; border-color: #1a2e5a; }
+    table.items td input[readonly] { background: #f9fafb; color: #6b7280; text-align: right; }
+    table.items td input.num-in { text-align: right; }
+    table.items td input.url-in { font-size: 12px; }
+    table.items tbody tr:hover td { background: #fafafa; }
+    table.items tfoot td {
+      padding: 10px 6px 4px;
+      font-weight: 600;
+      text-align: right;
+      font-size: 13px;
+    }
+    table.items tfoot td.total-label { text-align: right; color: #374151; }
+    table.items tfoot td.total-val { color: #1a2e5a; font-size: 15px; }
+
+    .btn-remove {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #d1d5db;
+      font-size: 16px;
+      padding: 2px 4px;
+      border-radius: 4px;
+      transition: color .15s;
+    }
+    .btn-remove:hover { color: #dc2626; }
+
+    .items-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .btn-add-item {
+      background: #f0f4ff;
+      border: 1px dashed #93b4f0;
+      color: #1a2e5a;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background .15s;
+    }
+    .btn-add-item:hover { background: #dce8ff; }
+    .btn-add-item:disabled { opacity: .4; cursor: not-allowed; }
+    .item-count { font-size: 12px; color: #9ca3af; }
+
+    /* ── Total banner ───────────────────────────────────────────── */
+    .total-banner {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 20px;
+      background: #f0f4ff;
+      border-radius: 8px;
+      margin-top: 4px;
+    }
+    .total-banner span { font-size: 13px; color: #374151; }
+    .total-banner strong { font-size: 20px; color: #1a2e5a; }
+
+    /* ── Submit ─────────────────────────────────────────────────── */
+    .submit-row {
+      display: flex;
+      justify-content: center;
+      padding: 8px 0 4px;
+    }
+    .btn-submit {
+      background: #1a2e5a;
+      color: #fff;
+      border: none;
+      padding: 13px 40px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      letter-spacing: .3px;
+      transition: background .15s, transform .1s;
+    }
+    .btn-submit:hover { background: #243e78; }
+    .btn-submit:active { transform: scale(.98); }
+    .btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
+
+    /* ── Notices ────────────────────────────────────────────────── */
+    .notice {
+      border-radius: 8px;
+      padding: 14px 18px;
+      font-size: 13px;
+      margin-top: 8px;
+      display: none;
+    }
+    .notice.error { background: #fef2f2; border: 1px solid #fca5a5; color: #991b1b; }
+    .notice.success { background: #f0fdf4; border: 1px solid #86efac; color: #166534; }
+
+    /* ── Success screen ─────────────────────────────────────────── */
+    #success-screen {
+      display: none;
+      text-align: center;
+      padding: 60px 20px;
+    }
+    #success-screen .icon { font-size: 56px; margin-bottom: 16px; }
+    #success-screen h2 { color: #1a2e5a; font-size: 22px; margin-bottom: 8px; }
+    #success-screen p { color: #666; margin-bottom: 24px; }
+    .btn-new { background: #1a2e5a; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .btn-new:hover { background: #243e78; }
+  </style>
+</head>
+<body>
+
+<!-- ── Site header ───────────────────────────────────────────────── -->
+<header class="site-header">
+  <div class="brand">
+    <span>ST. MARY'S ACADEMY</span>
+    <span class="accent">|</span>
+    <span style="font-weight:400;font-size:14px;">Purchase Order Request</span>
+  </div>
+  <div class="user-info" id="user-info" style="display:none;">
+    <img id="user-avatar" src="" alt="avatar" />
+    <span id="user-name"></span>
+    <button class="btn-signout" onclick="handleSignOut()">Sign out</button>
+  </div>
+</header>
+
+<!-- ── Sign-in wall ──────────────────────────────────────────────── -->
+<div id="sign-in-wall">
+  <div class="card">
+    <h2>Staff Sign-In Required</h2>
+    <p>Sign in with your St. Mary's Academy Google account to submit a purchase order request.</p>
+    <div id="google-btn"></div>
+    <div class="error-msg" id="auth-error"></div>
+  </div>
+</div>
+
+<!-- ── Main app ──────────────────────────────────────────────────── -->
+<main id="app">
+
+  <div class="form-title">
+    <h1>Pre-Approved Expense Request</h1>
+    <p>Complete all required fields and click Submit. Your request will be sent to the Director of Operations for approval.</p>
+  </div>
+
+  <form id="po-form" novalidate>
+
+    <!-- Request details ──────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">Request Details</div>
+      <div class="card-body">
+        <div class="grid-4" style="margin-bottom:16px;">
+          <div class="field col-span-2">
+            <label>Faculty / Staff Name</label>
+            <input type="text" id="submitter-name" readonly />
+          </div>
+          <div class="field">
+            <label>Department <span class="req">*</span></label>
+            <input type="text" id="department" placeholder="e.g. STEM, IT, Elementary" required />
+          </div>
+          <div class="field">
+            <label>Date Requested</label>
+            <input type="text" id="date-requested" readonly />
+          </div>
+        </div>
+
+        <div class="grid-4" style="margin-bottom:16px;">
+          <div class="field col-span-2">
+            <label>Purpose of Request <span class="req">*</span></label>
+            <input type="text" id="purpose" placeholder="Brief description of what this purchase is for" required />
+          </div>
+          <div class="field">
+            <label>Date Needed <span class="req">*</span></label>
+            <input type="date" id="date-needed" required />
+          </div>
+          <div class="field">
+            <label>Account Name & # <span class="req">*</span></label>
+            <select id="account-code" required>
+              <option value="">— select —</option>
+              <option value="7105.037.00.10 Supplies">7105.037.00.10 — Supplies</option>
+              <option value="7200.037.00.10 Copier">7200.037.00.10 — Copier</option>
+              <option value="7365.037.00.10 Consulting">7365.037.00.10 — Consulting</option>
+              <option value="7390.037.00.10 Website Dev">7390.037.00.10 — Website Dev</option>
+              <option value="7410.037.00.10 Furniture/Equip">7410.037.00.10 — Furniture / Equip</option>
+              <option value="7415.037.00.10 Software License">7415.037.00.10 — Software License Agreement</option>
+              <option value="7420.037.00.10 Utilities Internet">7420.037.00.10 — Utilities - Internet</option>
+              <option value="7520.037.00.10 Capital Impr">7520.037.00.10 — Capital Impr.</option>
+              <option value="7535.037.00.10 Utilities Telephone">7535.037.00.10 — Utilities - Telephone</option>
+              <option value="7655.037.00.10 Replacement Furn/Equip">7655.037.00.10 — Replacement Furn/Equip</option>
+              <option value="7660.037.00.10 Misc Expenses">7660.037.00.10 — Misc Expenses</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="personal-funds-row">
+          <input type="checkbox" id="personal-funds" />
+          <label for="personal-funds">
+            <strong>Personal Funds / Reimbursement Request</strong>
+            Check this box if you have already purchased the item with personal funds and are requesting reimbursement. The order will not be sent to Accounts Payable.
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Line items ───────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">Items</div>
+      <div class="card-body">
+        <div class="items-table-wrap">
+          <table class="items">
+            <thead>
+              <tr>
+                <th class="num">#</th>
+                <th class="qty">Qty <span class="req">*</span></th>
+                <th class="itemno">Item #</th>
+                <th>Description <span class="req">*</span></th>
+                <th class="uprice">Unit Price</th>
+                <th class="eprice">Ext. Price</th>
+                <th>Purchase URL</th>
+                <th class="remove"></th>
+              </tr>
+            </thead>
+            <tbody id="items-body">
+              <!-- rows injected by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="items-actions">
+          <button type="button" class="btn-add-item" id="btn-add-item" onclick="addItem()">+ Add Item</button>
+          <span class="item-count" id="item-count"></span>
+        </div>
+
+        <div class="total-banner">
+          <span>Total Cost (incl. shipping)</span>
+          <strong id="grand-total">$0.00</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Vendor ───────────────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">Vendor Information</div>
+      <div class="card-body">
+        <div class="grid-3" style="margin-bottom:14px;">
+          <div class="field col-span-2">
+            <label>Vendor Name</label>
+            <input type="text" id="vendor-name" placeholder="e.g. Amazon, Pearson, Inc." />
+          </div>
+          <div class="field">
+            <label>Phone Number</label>
+            <input type="tel" id="vendor-phone" placeholder="(xxx) xxx-xxxx" />
+          </div>
+        </div>
+        <div class="grid-3" style="margin-bottom:14px;">
+          <div class="field col-span-2">
+            <label>Address</label>
+            <input type="text" id="vendor-address" placeholder="Street address" />
+          </div>
+          <div class="field">
+            <label>City, State, ZIP</label>
+            <input type="text" id="vendor-city-state-zip" placeholder="Atlanta, GA 30303" />
+          </div>
+        </div>
+        <div class="grid-3">
+          <div class="field">
+            <label>Website</label>
+            <input type="url" id="vendor-web" placeholder="https://" />
+          </div>
+          <div class="field">
+            <label>Contact Name</label>
+            <input type="text" id="vendor-contact" />
+          </div>
+          <div class="field">
+            <label>Contact Email</label>
+            <input type="email" id="vendor-email" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit ───────────────────────────────────────────────────── -->
+    <div class="notice error" id="form-error"></div>
+    <div class="submit-row">
+      <button type="submit" class="btn-submit" id="btn-submit">Submit Purchase Order Request</button>
+    </div>
+
+  </form>
+
+  <!-- Success screen -->
+  <div id="success-screen">
+    <div class="icon">✅</div>
+    <h2>Request Submitted</h2>
+    <p>Your purchase order request has been sent to the Director of Operations for review.<br />You will receive an email notification once a decision has been made.</p>
+    <button class="btn-new" onclick="resetForm()">Submit Another Request</button>
+  </div>
+
+</main>
+
+<script>
+  /* ── Config ─────────────────────────────────────────────────────
+     Replace GOOGLE_CLIENT_ID with the OAuth 2.0 client ID from
+     Google Cloud Console → APIs & Services → Credentials.
+     The authorized JavaScript origin must include https://purchases.smaschool.org
+  ───────────────────────────────────────────────────────────────── */
+  const CONFIG = {
+    googleClientId: '494380619284-fltojkn6lv0livosiri1gldd55lcfda5.apps.googleusercontent.com',
+    webhookUrl:     'https://api.purchases.smaschool.org/webhook/po-submit',
+    allowedDomain:  'smaschool.org',
+    maxItems:       10,
+  };
+
+  /* ── Auth state ─────────────────────────────────────────────────── */
+  let currentUser = null;
+  let idToken     = null;
+
+  function parseJwt(token) {
+    try {
+      return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    } catch { return null; }
+  }
+
+  function handleCredentialResponse(response) {
+    const payload = parseJwt(response.credential);
+    if (!payload) return showAuthError('Unable to verify your sign-in. Please try again.');
+
+    const email = payload.email || '';
+    const hd    = payload.hd   || '';
+
+    if (hd !== CONFIG.allowedDomain && !email.endsWith('@' + CONFIG.allowedDomain)) {
+      google.accounts.id.disableAutoSelect();
+      return showAuthError('Access is restricted to St. Mary\'s Academy staff accounts (@smaschool.org).');
+    }
+
+    currentUser = { name: payload.name, email: payload.email, picture: payload.picture };
+    idToken     = response.credential;
+
+    document.getElementById('user-name').textContent   = currentUser.name;
+    document.getElementById('user-avatar').src          = currentUser.picture || '';
+    document.getElementById('user-info').style.display = 'flex';
+    document.getElementById('auth-error').style.display = 'none';
+
+    document.getElementById('submitter-name').value   = currentUser.name;
+    document.getElementById('date-requested').value   = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+
+    document.getElementById('sign-in-wall').style.display = 'none';
+    document.getElementById('app').style.display           = 'block';
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('auth-error');
+    el.textContent      = msg;
+    el.style.display    = 'block';
+  }
+
+  function handleSignOut() {
+    google.accounts.id.disableAutoSelect();
+    currentUser = null;
+    idToken     = null;
+    document.getElementById('user-info').style.display    = 'none';
+    document.getElementById('app').style.display           = 'none';
+    document.getElementById('sign-in-wall').style.display  = 'flex';
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('po-form').style.display        = 'block';
+  }
+
+  /* ── Google Identity Services init ────────────────────────────── */
+  window.addEventListener('load', () => {
+    google.accounts.id.initialize({
+      client_id: CONFIG.googleClientId,
+      callback:  handleCredentialResponse,
+      auto_select: true,
+    });
+    google.accounts.id.renderButton(
+      document.getElementById('google-btn'),
+      { theme: 'outline', size: 'large', text: 'signin_with', shape: 'rectangular', width: 280 }
+    );
+    google.accounts.id.prompt();
+  });
+
+  /* ── Line items ─────────────────────────────────────────────────── */
+  let itemCount = 0;
+
+  function addItem() {
+    const tbody = document.getElementById('items-body');
+    if (tbody.rows.length >= CONFIG.maxItems) return;
+
+    itemCount++;
+    const idx = itemCount;
+    const tr  = document.createElement('tr');
+    tr.dataset.idx = idx;
+    tr.innerHTML = `
+      <td class="num">${tbody.rows.length + 1}</td>
+      <td><input type="number" class="num-in qty-in" min="0" step="any" placeholder="0" oninput="recalcRow(this)" data-row="${idx}" /></td>
+      <td><input type="text" placeholder="SKU / part #" /></td>
+      <td><input type="text" class="desc-in" placeholder="Item description" data-row="${idx}" /></td>
+      <td><input type="number" class="num-in price-in" min="0" step="0.01" placeholder="0.00" oninput="recalcRow(this)" data-row="${idx}" /></td>
+      <td><input type="text" class="num-in ext-in" readonly placeholder="0.00" data-row="${idx}" /></td>
+      <td><input type="url" class="url-in" placeholder="https://" /></td>
+      <td><button type="button" class="btn-remove" title="Remove row" onclick="removeItem(this)">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+    updateItemNumbers();
+    updateAddBtn();
+  }
+
+  function removeItem(btn) {
+    btn.closest('tr').remove();
+    updateItemNumbers();
+    updateAddBtn();
+    recalcTotal();
+  }
+
+  function updateItemNumbers() {
+    const rows = document.getElementById('items-body').rows;
+    for (let i = 0; i < rows.length; i++) {
+      rows[i].cells[0].textContent = i + 1;
+    }
+    document.getElementById('item-count').textContent =
+      rows.length + ' / ' + CONFIG.maxItems + ' items';
+  }
+
+  function updateAddBtn() {
+    const rows = document.getElementById('items-body').rows;
+    document.getElementById('btn-add-item').disabled = rows.length >= CONFIG.maxItems;
+  }
+
+  function recalcRow(input) {
+    const tr     = input.closest('tr');
+    const qty    = parseFloat(tr.querySelector('.qty-in').value)   || 0;
+    const price  = parseFloat(tr.querySelector('.price-in').value) || 0;
+    const ext    = qty * price;
+    tr.querySelector('.ext-in').value = ext > 0 ? ext.toFixed(2) : '';
+    recalcTotal();
+  }
+
+  function recalcTotal() {
+    let total = 0;
+    document.querySelectorAll('.ext-in').forEach(el => {
+      total += parseFloat(el.value) || 0;
+    });
+    document.getElementById('grand-total').textContent = '$' + total.toFixed(2);
+  }
+
+  /* ── Build payload ──────────────────────────────────────────────── */
+  function buildPayload() {
+    const lineItems = [];
+    document.getElementById('items-body').querySelectorAll('tr').forEach(tr => {
+      const cells   = tr.querySelectorAll('input');
+      const qty     = parseFloat(cells[0].value) || 0;
+      const itemNo  = cells[1].value.trim();
+      const desc    = cells[2].value.trim();
+      const uPrice  = parseFloat(cells[3].value) || 0;
+      const extP    = parseFloat(cells[4].value) || 0;
+      const url     = cells[5].value.trim();
+      if (qty > 0 || desc) {
+        lineItems.push({ quantity: qty, itemNumber: itemNo, description: desc,
+                         unitPrice: uPrice, extPrice: extP, purchaseUrl: url });
+      }
+    });
+
+    const totalText = document.getElementById('grand-total').textContent.replace('$', '');
+
+    return {
+      idToken:        idToken,
+      submitterName:  currentUser.name,
+      submitterEmail: currentUser.email,
+      department:     document.getElementById('department').value.trim(),
+      dateRequested:  document.getElementById('date-requested').value,
+      dateNeeded:     document.getElementById('date-needed').value,
+      purpose:        document.getElementById('purpose').value.trim(),
+      accountCode:    document.getElementById('account-code').value,
+      personalFunds:  document.getElementById('personal-funds').checked,
+      totalCost:      parseFloat(totalText) || 0,
+      lineItems,
+      vendor: {
+        name:         document.getElementById('vendor-name').value.trim(),
+        address:      document.getElementById('vendor-address').value.trim(),
+        cityStateZip: document.getElementById('vendor-city-state-zip').value.trim(),
+        phone:        document.getElementById('vendor-phone').value.trim(),
+        webAddress:   document.getElementById('vendor-web').value.trim(),
+        contactName:  document.getElementById('vendor-contact').value.trim(),
+        email:        document.getElementById('vendor-email').value.trim(),
+      },
+    };
+  }
+
+  /* ── Validation ─────────────────────────────────────────────────── */
+  function validate(payload) {
+    if (!payload.department)  return 'Department is required.';
+    if (!payload.purpose)     return 'Purpose of Request is required.';
+    if (!payload.dateNeeded)  return 'Date Needed is required.';
+    if (!payload.accountCode) return 'Account Name & # is required.';
+    if (!payload.lineItems.length) return 'At least one line item with a quantity and description is required.';
+    for (const [i, item] of payload.lineItems.entries()) {
+      if (!item.description) return `Row ${i + 1}: Description is required.`;
+      if (item.quantity <= 0) return `Row ${i + 1}: Quantity must be greater than zero.`;
+    }
+    return null;
+  }
+
+  /* ── Submit ─────────────────────────────────────────────────────── */
+  document.getElementById('po-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const errEl  = document.getElementById('form-error');
+    const btn    = document.getElementById('btn-submit');
+    errEl.style.display = 'none';
+
+    const payload = buildPayload();
+    const valErr  = validate(payload);
+    if (valErr) {
+      errEl.textContent    = valErr;
+      errEl.style.display  = 'block';
+      errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    btn.disabled    = true;
+    btn.textContent = 'Submitting…';
+
+    try {
+      const res = await fetch(CONFIG.webhookUrl, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Server returned ' + res.status);
+
+      document.getElementById('po-form').style.display          = 'none';
+      document.getElementById('success-screen').style.display   = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    } catch (err) {
+      errEl.textContent   = 'Submission failed. Please try again or contact IT if the issue persists. (' + err.message + ')';
+      errEl.style.display = 'block';
+      errEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Submit Purchase Order Request';
+    }
+  });
+
+  /* ── Reset ──────────────────────────────────────────────────────── */
+  function resetForm() {
+    document.getElementById('po-form').reset();
+    document.getElementById('submitter-name').value = currentUser.name;
+    document.getElementById('date-requested').value = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+    document.getElementById('items-body').innerHTML = '';
+    itemCount = 0;
+    recalcTotal();
+    updateAddBtn();
+    document.getElementById('success-screen').style.display = 'none';
+    document.getElementById('po-form').style.display         = 'block';
+    document.getElementById('form-error').style.display      = 'none';
+    addItem(); // start with one empty row
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Init ───────────────────────────────────────────────────────── */
+  addItem(); // one empty row on load
+</script>
+
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "PO Approval Workflow",
+  "nodes": [],
+  "connections": {},
+  "active": false,
+  "settings": {},
+  "tags": [],
+  "__comment": "Placeholder — workflow will be built in n8n and exported here. Three stages: Department Head → Principal → Finance."
+}
