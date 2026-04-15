@@ -364,7 +364,27 @@
           </div>
           <div class="field">
             <label>Department <span class="req">*</span></label>
-            <input type="text" id="department" placeholder="e.g. STEM, IT, Elementary" required />
+            <select id="department" required onchange="populateAccounts()">
+              <option value="">— select —</option>
+              <option>Administration</option>
+              <option>Advancement</option>
+              <option>Athletics</option>
+              <option>Business Office</option>
+              <option>Development</option>
+              <option>Facilities</option>
+              <option>Fine Arts</option>
+              <option>Guidance</option>
+              <option>Library</option>
+              <option>Math</option>
+              <option>Model UN</option>
+              <option>NHS</option>
+              <option>PE</option>
+              <option>Science</option>
+              <option>STEM</option>
+              <option>Student Services</option>
+              <option>Technology</option>
+              <option>Theology</option>
+            </select>
           </div>
           <div class="field">
             <label>Date Requested</label>
@@ -383,19 +403,8 @@
           </div>
           <div class="field">
             <label>Account Name & # <span class="req">*</span></label>
-            <select id="account-code" required>
-              <option value="">— select —</option>
-              <option value="7105.037.00.10 Supplies">7105.037.00.10 — Supplies</option>
-              <option value="7200.037.00.10 Copier">7200.037.00.10 — Copier</option>
-              <option value="7365.037.00.10 Consulting">7365.037.00.10 — Consulting</option>
-              <option value="7390.037.00.10 Website Dev">7390.037.00.10 — Website Dev</option>
-              <option value="7410.037.00.10 Furniture/Equip">7410.037.00.10 — Furniture / Equip</option>
-              <option value="7415.037.00.10 Software License">7415.037.00.10 — Software License Agreement</option>
-              <option value="7420.037.00.10 Utilities Internet">7420.037.00.10 — Utilities - Internet</option>
-              <option value="7520.037.00.10 Capital Impr">7520.037.00.10 — Capital Impr.</option>
-              <option value="7535.037.00.10 Utilities Telephone">7535.037.00.10 — Utilities - Telephone</option>
-              <option value="7655.037.00.10 Replacement Furn/Equip">7655.037.00.10 — Replacement Furn/Equip</option>
-              <option value="7660.037.00.10 Misc Expenses">7660.037.00.10 — Misc Expenses</option>
+            <select id="account-code" required disabled>
+              <option value="">— select department first —</option>
             </select>
           </div>
         </div>
@@ -764,6 +773,264 @@
     document.getElementById('form-error').style.display      = 'none';
     addItem(); // start with one empty row
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Department → Account mapping ──────────────────────────────── */
+  const DEPT_ACCOUNTS = {
+    'Administration': [
+      '7135.031.00.20.00S — Printing & Stationery',
+      '7220.031.10.20.00S — Co-Curricular Events/Field Trips LS',
+      '7105.031.13.10.00S — Supplies Expense - HS',
+      '7110.031.13.10.00S — Textbooks - HS',
+      '7115.031.13.10.00S — Instructional Materials - Gen. Instr.',
+      '7120.031.13.10.00S — Academic Testing - HS',
+      '7205.031.13.10.00S — Conventions Meetings & Seminars',
+      '7275.031.13.10.00S — Professional Development - Gen\'l Instruc',
+      '7445.031.13.10.00S — Pupil Insurance - HS',
+      '7700.031.13.10.00S — Miscellaneous Expenses - HS',
+      '7105.031.13.20.00S — Supplies Expense - LS',
+      '7110.031.13.20.00S — Textbooks - LS',
+      '7115.031.13.20.00S — Instructional Material - LS',
+      '7120.031.13.20.00S — Academic Testing - LS',
+      '7275.031.13.20.00S — Professional Development - LS',
+      '7445.031.13.20.00S — Pupil Insurance - LS',
+      '7450.031.13.20.00S — Pupil Tax',
+      '7700.031.13.20.00S — Miscellaneous Expenses - LS',
+      '7105.032.09.10.00S — Supplies Expense - Gen\'l Admin.',
+      '7130.032.09.10.00S — Postage - Gen\'l Admin',
+      '7135.032.09.10.00S — Printing & Stationery - Gen\'l Admin',
+      '7150.032.09.10.00S — Travel - Gen\'l Admin',
+      '7205.032.09.10.00S — Conventions Meetings & Seminars - Admin',
+      '7225.032.09.10.00S — Hospitality / Staff Appreciation - Gen\'l',
+      '7255.032.09.10.00S — Legal & Accounting - Gen\'l Admin',
+      '7260.032.09.10.00S — Dues - Gen\'l Admin',
+      '7270.032.09.10.00S — Advertising',
+      '7280.032.09.10.00S — Accreditation Process - Gen\'l Admin',
+      '7360.032.09.10.00S — Pre-Employment Expense - Gen\'l Admin',
+      '7540.032.09.10.00S — Utilities - Cell Phone - Gen\'l Admin',
+      '7105.032.09.20.00S — Supplies Expense - LS Admin',
+      '7150.032.09.20.00S — Travel - LS Admin',
+      '7225.032.09.20.00S — Hospitality - LS Admin',
+      '7260.032.09.20.00S — Dues - LS Admin',
+      '7280.032.09.20.00S — Accreditation Process - LS Admin',
+      '7360.032.09.20.00S — Pre-Employment Expense - LS Admin',
+    ],
+    'Advancement': [
+      '7105.032.06.10.00S — Supplies Expense - Admissions',
+      '7135.032.06.10.00S — Printing & Stationery - Admissions',
+      '7205.032.06.10.00S — Conventions Meetings & Seminars - Admissions',
+      '7260.032.06.10.00S — Dues - Admissions',
+      '7270.032.06.10.00S — Advertising - Admissions',
+      '7275.032.06.10.00S — Professional Development - Admissions',
+      '7105.032.07.00.00S — Supplies Expense - Busi Ops',
+      '7260.032.07.00.00S — Dues - Business Ops',
+      '7270.032.07.00.00S — Advertising - Business Ops',
+    ],
+    'Athletics': [
+      '7105.038.00.10.00S — Supplies Expense - General',
+      '7220.038.00.10.00S — Co-Curricular Events/Field Trips',
+      '7230.038.00.10.00S — Concessions Purchases',
+      '7040.038.06.10.00S — Officials - Baseball',
+      '7105.038.06.10.00S — Supplies Expense - Baseball',
+      '7220.038.06.10.00S — Student Honors - Baseball',
+      '7260.038.06.10.00S — Dues - Baseball',
+      '7040.038.07.10.00S — Officials - Boys Basketball',
+      '7105.038.07.10.00S — Supplies Expense - Boys Basketball',
+      '7260.038.07.10.00S — Dues - Boys Basketball',
+      '7040.038.08.10.00S — Officials - Girls Basketball',
+      '7115.038.08.10.00S — Instructional Materials - Girls Basketball',
+      '7260.038.08.10.00S — Dues - Girls Basketball',
+      '7660.038.08.10.00S — Capital Improvements - Girls Basketball',
+      '7105.038.09.10.00S — Supplies Expense - Cheerleading',
+      '7220.038.09.10.00S — Co-Curricular Events - Cheerleading',
+      '7220.038.10.10.00S — Student Honors - Cross Country',
+      '7260.038.10.10.00S — Dues - Cross Country',
+      '7700.038.10.10.00S — Miscellaneous Expenses - Cross Country',
+      '7040.038.11.10.00S — Officials - Football',
+      '7105.038.11.10.00S — Supplies Expense - Football',
+      '7220.038.11.10.00S — Student Honors - Football',
+      '7260.038.11.10.00S — Dues - Football',
+      '7660.038.11.10.00S — Athletic Equipment - Football',
+      '7105.038.13.10.00S — Supplies Expense - Gen\'l Athletics',
+      '7205.038.13.10.00S — Coaches Clinics - Gen\'l Athletics',
+      '7260.038.13.10.00S — Dues - Gen\'l Athletics',
+      '7540.038.13.10.00S — Utilities - Cell Phone - Athletics',
+      '7660.038.13.10.00S — Athletic Equipment - HS',
+      '7660.038.13.20.00S — Athletic Equipment - LS',
+      '7040.038.15.10.00S — Officials - Boys Soccer',
+      '7105.038.15.10.00S — Supplies Expense - Boys Soccer',
+      '7220.038.15.10.00S — Student Honors - Boys Soccer',
+      '7260.038.15.10.00S — Dues - Boys Soccer',
+      '7040.038.16.10.00S — Officials - Girls Soccer',
+      '7105.038.16.10.00S — Supplies Expense - Girls Soccer',
+      '7220.038.16.10.00S — Student Honors - Girls Soccer',
+      '7260.038.16.10.00S — Dues - Girls Soccer',
+      '7700.038.18.10.00S — Miscellaneous Expenses - Swim',
+      '7105.038.19.10.00S — Supplies Expense - Tennis',
+      '7260.038.19.10.00S — Dues - Tennis',
+      '7105.038.20.10.00S — Supplies Expense - Track/Field',
+      '7220.038.20.10.00S — Student Honors - Track & Field',
+      '7260.038.20.10.00S — Dues - Track/Field',
+      '7040.038.20.10.00S — Officials - Track/Field',
+      '7105.038.21.10.00S — Supplies Expense - Trainer',
+      '7040.038.22.10.00S — Officials - Volleyball HS',
+      '7105.038.22.10.00S — Supplies Expense - Volleyball',
+      '7115.038.22.10.00S — Athletic Uniforms - Volleyball',
+      '7220.038.22.10.00S — Student Honors - Volleyball',
+      '7260.038.22.10.00S — Dues - Volleyball',
+      '7040.038.22.20.00S — Officials - Volleyball LS',
+      '7040.038.25.20.00S — Professional Services - Officials - LS',
+    ],
+    'Business Office': [
+      '7355.032.07.00.00S — Bank Fees - Business Office',
+      '7105.032.07.10.00S — Supplies Expense - Business Ops',
+      '7135.032.07.10.00S — Printing & Stationery - Business Office',
+      '7260.032.07.10.00S — Dues - Business Office',
+      '7350.032.07.10.00S — Payroll Processing Cost',
+      '7355.032.07.10.00S — Bank Fees - Business Office',
+    ],
+    'Development': [
+      '7270.035.00.10.00S — Advertising',
+      '7105.035.01.10.00S — Supplies Expense - MercyWear',
+    ],
+    'Facilities': [
+      '7040.034.00.10.00S — Event Facilitator & Security',
+      '7365.034.00.10.00S — R&M - Vehicles',
+      '7385.034.00.10.00S — Vehicle Operation - Fuel',
+      '7400.034.00.10.00S — R&M - Building',
+      '7405.034.00.10.00S — R&M - Grounds',
+      '7410.034.00.10.00S — R&M - Equipment (Inside)',
+      '7425.034.00.10.00S — Janitorial Services',
+      '7430.034.00.10.00S — Maint Contracts - Grounds',
+      '7435.034.00.10.00S — Maint Contracts - HVAC',
+      '7440.034.00.10.00S — Insurance - Property, Liability, Auto',
+      '7500.034.00.10.00S — Utilities - Electricity',
+      '7510.034.00.10.00S — Utilities - Natural Gas',
+      '7525.034.00.10.00S — Utilities - Water & Sewer',
+      '7530.034.00.10.00S — Utilities - Trash Removal',
+      '7545.034.00.10.00S — Janitorial Supplies',
+      '7660.034.00.10.00S — Capital Improvements/Asset Purchases',
+      '7700.034.00.10.00S — Miscellaneous Expenses',
+      '7400.034.01.10.00S — R&M - HVAC',
+      '7425.034.01.10.00S — Maint Contracts - Security System',
+      '7425.034.02.10.00S — Maint Contracts - Fire Safety',
+      '7425.034.03.10.00S — Maint Contracts - Generator',
+      '7425.034.04.10.00S — Maint Contracts - Water Treatment',
+      '7425.034.05.10.00S — Maint Contracts - Pest Control',
+    ],
+    'Fine Arts': [
+      '7130.031.06.00.00S — Postage - Art',
+      '7105.031.06.10.00S — Supplies Expense - Art',
+      '7115.031.06.10.00S — Instructional Materials - Art',
+      '7260.031.06.00.00S — Dues - Art',
+      '7105.031.08.10.00S — Supplies Expense - Dance',
+      '7115.031.08.10.00S — Instructional Materials - Dance',
+      '7260.031.08.10.00S — Dues - Dance',
+      '7115.031.09.10.00S — Instructional Materials - Drama Class',
+      '7200.031.09.10.00S — Leases and Rentals - Drama Class',
+      '7260.031.09.10.00S — Dues - Drama Class',
+      '7105.031.10.10.00S — Supplies Expense - Drama Club',
+      '7115.031.10.10.00S — Instructional Materials - Drama Club',
+      '7200.031.10.10.00S — Leases & Rentals - Drama Club',
+      '7220.031.10.10.00S — Co-Curricular Events/Field Trips - Drama',
+      '7260.031.10.10.00S — Dues - Drama Club',
+      '7700.031.10.10.00S — Miscellaneous Expenses - Drama Club',
+      '7115.031.16.10.00S — Instructional Materials - Music',
+      '7105.031.22.10.00S — Supplies Expense - Theatre Tech',
+    ],
+    'Guidance': [
+      '7105.032.08.10.00S — Supplies Expense - Guidance',
+      '7260.032.08.10.00S — Dues - College Counseling',
+      '7105.033.10.10.00S — Guidance Materials',
+      '7120.033.10.10.00S — Guidance Supplies/Post./Print',
+    ],
+    'Library': [
+      '7140.031.15.20.00S — Library/Media Materials - Media Svcs',
+    ],
+    'Math': [
+      '7105.031.14.10.00S — Supplies Expense - Math',
+      '7115.031.14.00.00S — Instructional Materials - Math',
+      '7260.031.14.10.00S — Dues - Math',
+    ],
+    'Model UN': [
+      '7260.033.12.10.00S — Dues - Model UN',
+    ],
+    'NHS': [
+      '7105.033.13.10.00S — Supplies Expense - NHS',
+    ],
+    'PE': [
+      '7115.031.17.00.00S — Instructional Materials - Phys. Ed.',
+    ],
+    'Science': [
+      '7105.031.18.10.00S — Supplies Expense - Science',
+      '7115.031.18.00.00S — Instructional Materials - Science',
+      '7660.031.18.00.00S — Asset Additions - Science',
+    ],
+    'STEM': [
+      '7115.031.18.10.00S — Instructional Materials - STEM',
+      '7105.031.24.10.00S — Supplies Expense - Robotics',
+      '7115.031.24.10.00S — Instructional Materials - Robotics',
+    ],
+    'Student Services': [
+      '7250.033.00.10.00S — Graduation',
+      '7105.033.07.10.00S — Supplies Expense - Campus Ministry',
+      '7115.033.07.10.00S — Instructional Materials - Campus Ministry',
+      '7220.033.07.10.00S — Co-Curricular Events - Campus Ministry',
+      '7105.033.08.10.00S — Supplies - Chapel',
+      '7700.033.08.10.00S — Miscellaneous Expenses - Chapel',
+      '7105.033.09.10.00S — Supplies Expense - Gen\'l Student Svcs.',
+      '7120.033.09.10.00S — Academic Testing - Gen\'l Stud. Svcs.',
+      '7220.033.09.10.00S — Co-Curr Events/Field Trips - Student Svcs',
+      '7250.033.09.10.00S — Graduation Expense - General',
+      '7260.033.09.10.00S — Dues - Student Services',
+      '7220.033.11.10.00S — Co-Curricular Events/Field Trips - HS',
+      '7220.033.11.20.00S — Co-Curricular Events/Field Trips - LS',
+      '7260.033.13.10.00S — Clubs',
+      '7220.033.14.10.00S — Music Ministry',
+    ],
+    'Technology': [
+      '7105.037.00.10.00S — Supplies Expense',
+      '7200.037.00.10.00S — Copier/Postage Lease',
+      '7390.037.00.10.00S — Website Development',
+      '7410.037.00.10.00S — R&M - Furniture/Equipment',
+      '7415.037.00.10.00S — Software License Agreements',
+      '7420.037.00.10.00S — Software Maintenance Contracts',
+      '7520.037.00.10.00S — Utilities - Internet Services',
+      '7535.037.00.10.00S — Utilities - Telephone',
+      '7655.037.00.10.00S — Replacement of Furn/Equip - Hardware',
+      '7660.037.00.10.00S — Capital Improvements/Asset Purchases',
+      '7700.037.00.10.00S — Miscellaneous Expenses',
+    ],
+    'Theology': [
+      '7105.031.23.10.00S — Supplies Expense - Theology',
+      '7115.031.23.10.00S — Instructional Materials - Theology',
+    ],
+  };
+
+  function populateAccounts() {
+    const dept    = document.getElementById('department').value;
+    const select  = document.getElementById('account-code');
+    select.innerHTML = '';
+
+    if (!dept || !DEPT_ACCOUNTS[dept]) {
+      select.innerHTML = '<option value="">— select department first —</option>';
+      select.disabled  = true;
+      return;
+    }
+
+    const placeholder = document.createElement('option');
+    placeholder.value       = '';
+    placeholder.textContent = '— select account —';
+    select.appendChild(placeholder);
+
+    DEPT_ACCOUNTS[dept].forEach(entry => {
+      const opt       = document.createElement('option');
+      opt.value       = entry;
+      opt.textContent = entry;
+      select.appendChild(opt);
+    });
+
+    select.disabled = false;
   }
 
   /* ── Init ───────────────────────────────────────────────────────── */

@@ -1,9 +1,862 @@
 {
   "name": "PO Approval Workflow",
-  "nodes": [],
-  "connections": {},
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "po-submit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Webhook - PO Submit",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body ?? $input.first().json;\n\n// Generate PO number: PO-YYYYMMDD-XXXX\nconst now = new Date();\nconst pad = (n) => String(n).padStart(2,'0');\nconst datePart = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;\nconst randPart = String(Math.floor(Math.random()*9000)+1000);\nconst poNumber = `PO-${datePart}-${randPart}`;\n\n// Build item links summary (for emails and Sheets)\nconst lineItems = (body.lineItems || []).filter(i => i.description);\nconst itemSummaryHtml = lineItems.map((item, idx) => {\n  const url = item.purchaseUrl ? `<a href=\"${item.purchaseUrl}\">${item.purchaseUrl}</a>` : '—';\n  return `<tr>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">${item.quantity}</td>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">${item.itemNumber || '—'}</td>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">${item.description}</td>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">$${Number(item.unitPrice||0).toFixed(2)}</td>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">$${Number(item.extPrice||0).toFixed(2)}</td>\n    <td style=\"padding:4px 8px;border:1px solid #e5e7eb;\">${url}</td>\n  </tr>`;\n}).join('');\n\nconst itemLinksPlain = lineItems\n  .filter(i => i.purchaseUrl)\n  .map(i => `${i.description}: ${i.purchaseUrl}`)\n  .join('\\n');\n\nconst submittedAt = now.toISOString();\n\nreturn [{\n  json: {\n    ...body,\n    poNumber,\n    submittedAt,\n    lineItems,\n    itemSummaryHtml,\n    itemLinksPlain,\n    totalCostFormatted: `$${Number(body.totalCost||0).toFixed(2)}`,\n    isPersonalFunds: body.personalFunds === true || body.personalFunds === 'true',\n  }\n}];"
+      },
+      "id": "2",
+      "name": "Prepare PO Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PO #": "={{ $json.poNumber }}",
+            "Submitter Name": "={{ $json.submitterName }}",
+            "Submitter Email": "={{ $json.submitterEmail }}",
+            "Department": "={{ $json.department }}",
+            "Date Requested": "={{ $json.dateRequested }}",
+            "Date Needed": "={{ $json.dateNeeded }}",
+            "Purpose": "={{ $json.purpose }}",
+            "Account Code": "={{ $json.accountCode }}",
+            "Personal Funds": "={{ $json.isPersonalFunds ? 'Yes' : 'No' }}",
+            "Total Cost": "={{ $json.totalCostFormatted }}",
+            "Vendor Name": "={{ $json.vendor.name }}",
+            "Status": "=Pending - Director of Operations",
+            "Submitted At": "={{ $json.submittedAt }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "3",
+      "name": "Sheet - Log All Requests",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [680, 300],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, poNumber: $('Prepare PO Data').first().json.poNumber }) }}",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Respond to Frontend",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 480]
+    },
+    {
+      "parameters": {
+        "sendTo": "mkomdat@smaschool.org",
+        "subject": "=PO Approval Request: {{ $('Prepare PO Data').first().json.poNumber }} — {{ $('Prepare PO Data').first().json.purpose }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order Approval Request</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Hi Mark,</p>\n    <p style=\"color:#374151;\">A new purchase order request requires your approval.</p>\n    <table style=\"width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;\">\n      <tr><td style=\"padding:6px 0;color:#6b7280;width:140px;\">PO Number</td><td style=\"padding:6px 0;font-weight:600;\">{{ $('Prepare PO Data').first().json.poNumber }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Requested By</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.submitterName }} ({{ $('Prepare PO Data').first().json.submitterEmail }})</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Department</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.department }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Purpose</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.purpose }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Account Code</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.accountCode }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Date Needed</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.dateNeeded }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Total Cost</td><td style=\"padding:6px 0;font-weight:600;color:#1a2e5a;\">{{ $('Prepare PO Data').first().json.totalCostFormatted }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Fulfillment</td><td style=\"padding:6px 0;\">{{ $('Prepare PO Data').first().json.isPersonalFunds ? 'Personal Funds (Reimbursement)' : 'Please Order' }}</td></tr>\n    </table>\n    <h4 style=\"color:#374151;margin:16px 0 8px;\">Items</h4>\n    <table style=\"width:100%;border-collapse:collapse;font-size:12px;\">\n      <tr style=\"background:#f3f4f6;\">\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Qty</th>\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Item #</th>\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Description</th>\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Unit Price</th>\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Ext. Price</th>\n        <th style=\"padding:6px 8px;border:1px solid #e5e7eb;text-align:left;\">Purchase URL</th>\n      </tr>\n      {{ $('Prepare PO Data').first().json.itemSummaryHtml }}\n    </table>\n    <h4 style=\"color:#374151;margin:16px 0 8px;\">Vendor</h4>\n    <p style=\"font-size:13px;color:#374151;margin:0;\">{{ $('Prepare PO Data').first().json.vendor.name }}<br/>{{ $('Prepare PO Data').first().json.vendor.address }}<br/>{{ $('Prepare PO Data').first().json.vendor.cityStateZip }}<br/>{{ $('Prepare PO Data').first().json.vendor.phone }}</p>\n    <div style=\"margin:28px 0 8px;text-align:center;\">\n      <a href=\"https://api.purchases.smaschool.org/webhook/po-approve?po={{ $('Prepare PO Data').first().json.poNumber }}&stage=doo&action=approve&email={{ $('Prepare PO Data').first().json.submitterEmail }}\" style=\"background:#166534;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin-right:12px;\">✓ Approve</a>\n      <a href=\"https://api.purchases.smaschool.org/webhook/po-approve?po={{ $('Prepare PO Data').first().json.poNumber }}&stage=doo&action=decline&email={{ $('Prepare PO Data').first().json.submitterEmail }}\" style=\"background:#991b1b;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;\">✗ Decline</a>\n    </div>\n    <p style=\"font-size:11px;color:#9ca3af;text-align:center;margin-top:16px;\">St. Mary's Academy Purchase Order System</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "5",
+      "name": "Email - Director of Operations",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "po-approve",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Webhook - Approval Action",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "decline-check",
+              "leftValue": "={{ $json.query.action }}",
+              "rightValue": "decline",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "7",
+      "name": "Declined?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "stage-check",
+              "leftValue": "={{ $('Webhook - Approval Action').first().json.query.stage }}",
+              "rightValue": "doo",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "8",
+      "name": "Which Stage?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 520]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook - Approval Action').first().json.query.email }}",
+        "subject": "=Purchase Order {{ $('Webhook - Approval Action').first().json.query.po }} — Action Required",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order Update</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Your purchase order request <strong>{{ $('Webhook - Approval Action').first().json.query.po }}</strong> has been declined.</p>\n    <p style=\"color:#374151;\">Please see <strong>{{ $('Webhook - Approval Action').first().json.query.stage === 'doo' ? 'Mark Komdat (Director of Operations)' : 'Cynthia Launay-Fallasse (Principal)' }}</strong> for further details.</p>\n    <p style=\"font-size:11px;color:#9ca3af;margin-top:24px;\">St. Mary's Academy Purchase Order System</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "9",
+      "name": "Email - Declined Notice to Submitter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [680, 700],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "=Declined by {{ $('Webhook - Approval Action').first().json.query.stage === 'doo' ? 'Director of Operations' : 'Principal' }}"
+          }
+        },
+        "where": {
+          "values": [
+            {
+              "column": "PO #",
+              "value": "={{ $('Webhook - Approval Action').first().json.query.po }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "10",
+      "name": "Sheet - Update Status Declined",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 700],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "html",
+        "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:60px;\"><h2 style=\"color:#991b1b;\">Request Declined</h2><p>The purchase order has been declined. The submitter has been notified.</p></body></html>",
+        "options": {}
+      },
+      "id": "11",
+      "name": "Respond - Declined",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 700]
+    },
+    {
+      "parameters": {
+        "sendTo": "clf@smaschool.org",
+        "subject": "=PO Approval Request: {{ $('Webhook - Approval Action').first().json.query.po }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order Approval Request — Principal Review</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Hi Cynthia,</p>\n    <p style=\"color:#374151;\">The following purchase order has been approved by the Director of Operations and requires your approval.</p>\n    <p style=\"font-size:13px;color:#374151;\"><strong>PO Number:</strong> {{ $('Webhook - Approval Action').first().json.query.po }}<br/><strong>Submitted by:</strong> {{ $('Webhook - Approval Action').first().json.query.email }}</p>\n    <p style=\"color:#6b7280;font-size:13px;\">Please review the details in the <a href=\"https://docs.google.com/spreadsheets/d/1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc\">PO Tracking Sheet</a> and take action below.</p>\n    <div style=\"margin:28px 0 8px;text-align:center;\">\n      <a href=\"https://api.purchases.smaschool.org/webhook/po-approve?po={{ $('Webhook - Approval Action').first().json.query.po }}&stage=principal&action=approve&email={{ $('Webhook - Approval Action').first().json.query.email }}\" style=\"background:#166534;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;margin-right:12px;\">✓ Approve</a>\n      <a href=\"https://api.purchases.smaschool.org/webhook/po-approve?po={{ $('Webhook - Approval Action').first().json.query.po }}&stage=principal&action=decline&email={{ $('Webhook - Approval Action').first().json.query.email }}\" style=\"background:#991b1b;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;\">✗ Decline</a>\n    </div>\n    <p style=\"font-size:11px;color:#9ca3af;text-align:center;margin-top:16px;\">St. Mary's Academy Purchase Order System</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "12",
+      "name": "Email - Principal",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [900, 520],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "html",
+        "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:60px;\"><h2 style=\"color:#166534;\">Approved ✓</h2><p>The request has been approved and forwarded to the next stage.</p></body></html>",
+        "options": {}
+      },
+      "id": "13",
+      "name": "Respond - Approved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 520]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "personal-funds-check",
+              "leftValue": "={{ $('Webhook - Approval Action').first().json.query.stage }}",
+              "rightValue": "principal",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "14",
+      "name": "Principal Stage?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 380]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "value1": "PO #",
+              "value2": "={{ $('Webhook - Approval Action').first().json.query.po }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "15",
+      "name": "Sheet - Get PO Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 380],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "pf-check",
+              "leftValue": "={{ $json['Personal Funds'] }}",
+              "rightValue": "Yes",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "16",
+      "name": "Personal Funds?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1120, 380]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook - Approval Action').first().json.query.email }}",
+        "subject": "=Purchase Order {{ $('Webhook - Approval Action').first().json.query.po }} — Approved",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order Approved</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Your reimbursement request <strong>{{ $('Webhook - Approval Action').first().json.query.po }}</strong> has been approved by the Principal.</p>\n    <p style=\"color:#374151;\">Please submit your original receipts to the Business Office for reimbursement processing.</p>\n    <p style=\"font-size:11px;color:#9ca3af;margin-top:24px;\">St. Mary's Academy Purchase Order System</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "17",
+      "name": "Email - Personal Funds Approval to Submitter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Approved - Reimbursement"
+          }
+        },
+        "where": {
+          "values": [
+            {
+              "column": "PO #",
+              "value": "={{ $('Webhook - Approval Action').first().json.query.po }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "18",
+      "name": "Sheet - Update Status Reimbursement",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1340, 460],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "pdelpilar@smaschool.org",
+        "subject": "=New Order to Place: {{ $('Webhook - Approval Action').first().json.query.po }}",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order — Ready to Place</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Hi Phyllis,</p>\n    <p style=\"color:#374151;\">The following purchase order has been approved and is ready to be placed.</p>\n    <table style=\"width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;\">\n      <tr><td style=\"padding:6px 0;color:#6b7280;width:140px;\">PO Number</td><td style=\"padding:6px 0;font-weight:600;\">{{ $('Webhook - Approval Action').first().json.query.po }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Requested By</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Submitter Name'] }} ({{ $('Sheet - Get PO Row').first().json['Submitter Email'] }})</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Department</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Department'] }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Purpose</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Purpose'] }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Account Code</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Account Code'] }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Total Cost</td><td style=\"padding:6px 0;font-weight:600;color:#1a2e5a;\">{{ $('Sheet - Get PO Row').first().json['Total Cost'] }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Vendor</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Vendor Name'] }}</td></tr>\n      <tr><td style=\"padding:6px 0;color:#6b7280;\">Date Needed</td><td style=\"padding:6px 0;\">{{ $('Sheet - Get PO Row').first().json['Date Needed'] }}</td></tr>\n    </table>\n    <h4 style=\"color:#374151;margin:16px 0 8px;\">Items &amp; Purchase Links</h4>\n    <p style=\"font-size:13px;color:#374151;\">See the <a href=\"https://docs.google.com/spreadsheets/d/1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc\">PO Tracking Sheet</a> for full item details.</p>\n    <div style=\"margin:28px 0 8px;text-align:center;\">\n      <a href=\"https://api.purchases.smaschool.org/webhook/po-ordered?po={{ $('Webhook - Approval Action').first().json.query.po }}&email={{ $('Webhook - Approval Action').first().json.query.email }}\" style=\"background:#1a2e5a;color:#fff;padding:14px 32px;border-radius:6px;text-decoration:none;font-weight:600;font-size:15px;\">✓ Order Placed</a>\n    </div>\n    <p style=\"font-size:11px;color:#9ca3af;text-align:center;margin-top:16px;\">Click the button above once you have placed the order.</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "19",
+      "name": "Email - Accounts Payable",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1340, 620],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "po-ordered",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "20",
+      "name": "Webhook - Order Placed",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 900]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Active Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PO #": "={{ $json.query.po }}",
+            "Submitter Name": "={{ $('Sheet - Get PO Row For Order').first().json['Submitter Name'] }}",
+            "Submitter Email": "={{ $json.query.email }}",
+            "Department": "={{ $('Sheet - Get PO Row For Order').first().json['Department'] }}",
+            "Date Requested": "={{ $('Sheet - Get PO Row For Order').first().json['Date Requested'] }}",
+            "Date Needed": "={{ $('Sheet - Get PO Row For Order').first().json['Date Needed'] }}",
+            "Purpose": "={{ $('Sheet - Get PO Row For Order').first().json['Purpose'] }}",
+            "Account Code": "={{ $('Sheet - Get PO Row For Order').first().json['Account Code'] }}",
+            "Total Cost": "={{ $('Sheet - Get PO Row For Order').first().json['Total Cost'] }}",
+            "Vendor Name": "={{ $('Sheet - Get PO Row For Order').first().json['Vendor Name'] }}",
+            "Item Links": "={{ $('Sheet - Get PO Row For Order').first().json['Item Links'] }}",
+            "Approved At": "={{ $('Sheet - Get PO Row For Order').first().json['Submitted At'] }}",
+            "Ordered At": "={{ new Date().toISOString() }}",
+            "Status": "Active"
+          }
+        },
+        "options": {}
+      },
+      "id": "21",
+      "name": "Sheet - Add to Active Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [680, 900],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "value1": "PO #",
+              "value2": "={{ $json.query.po }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "22",
+      "name": "Sheet - Get PO Row For Order",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [460, 900],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "All Requests",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Status": "Ordered"
+          }
+        },
+        "where": {
+          "values": [
+            {
+              "column": "PO #",
+              "value": "={{ $('Webhook - Order Placed').first().json.query.po }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "23",
+      "name": "Sheet - Update All Requests Ordered",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 900],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Webhook - Order Placed').first().json.query.email }}",
+        "subject": "=Purchase Order {{ $('Webhook - Order Placed').first().json.query.po }} — Approved & Ordered",
+        "emailType": "html",
+        "message": "=<div style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;\">\n  <div style=\"background:#1a2e5a;padding:20px 24px;border-radius:8px 8px 0 0;\">\n    <h2 style=\"color:#fff;margin:0;font-size:18px;\">St. Mary's Academy</h2>\n    <p style=\"color:#f5c518;margin:4px 0 0;font-size:13px;\">Purchase Order Approved &amp; Placed</p>\n  </div>\n  <div style=\"background:#fff;border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px;\">\n    <p style=\"color:#374151;\">Your purchase order <strong>{{ $('Webhook - Order Placed').first().json.query.po }}</strong> has been approved and the order has been placed by Accounts Payable.</p>\n    <p style=\"color:#374151;\">You will be notified once the items have arrived.</p>\n    <p style=\"font-size:11px;color:#9ca3af;margin-top:24px;\">St. Mary's Academy Purchase Order System</p>\n  </div>\n</div>",
+        "options": {
+          "replyTo": "noreply@smaschool.org"
+        }
+      },
+      "id": "24",
+      "name": "Email - Order Placed Confirmation to Submitter",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1120, 900],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "html",
+        "responseBody": "<html><body style=\"font-family:sans-serif;text-align:center;padding:60px;\"><h2 style=\"color:#166534;\">Order Placed ✓</h2><p>The order has been recorded. The submitter has been notified.</p></body></html>",
+        "options": {}
+      },
+      "id": "25",
+      "name": "Respond - Order Placed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 900]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "26",
+      "name": "Schedule - Check Received",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Active Orders",
+          "mode": "name"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "value1": "Status",
+              "value2": "Received"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "27",
+      "name": "Sheet - Get Received Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [460, 1100],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "has-rows",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      },
+      "id": "28",
+      "name": "Any Received?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 1100]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Completed Orders",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "PO #": "={{ $json['PO #'] }}",
+            "Submitter Name": "={{ $json['Submitter Name'] }}",
+            "Submitter Email": "={{ $json['Submitter Email'] }}",
+            "Department": "={{ $json['Department'] }}",
+            "Date Requested": "={{ $json['Date Requested'] }}",
+            "Date Needed": "={{ $json['Date Needed'] }}",
+            "Purpose": "={{ $json['Purpose'] }}",
+            "Account Code": "={{ $json['Account Code'] }}",
+            "Total Cost": "={{ $json['Total Cost'] }}",
+            "Vendor Name": "={{ $json['Vendor Name'] }}",
+            "Item Links": "={{ $json['Item Links'] }}",
+            "Approved At": "={{ $json['Approved At'] }}",
+            "Ordered At": "={{ $json['Ordered At'] }}",
+            "Received At": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "29",
+      "name": "Sheet - Move to Completed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [900, 1040],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "documentId": {
+          "__rl": true,
+          "value": "1_OkhP9-SlsXrQ5oa_l_AapGQXpDTQn3N6qlX2GJ6fWc",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Active Orders",
+          "mode": "name"
+        },
+        "where": {
+          "values": [
+            {
+              "column": "PO #",
+              "value": "={{ $json['PO #'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "30",
+      "name": "Sheet - Delete from Active Orders",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4,
+      "position": [1120, 1040],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "google-cred",
+          "name": "Google OAuth2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook - PO Submit": {
+      "main": [[{ "node": "Prepare PO Data", "type": "main", "index": 0 }]]
+    },
+    "Prepare PO Data": {
+      "main": [[
+        { "node": "Sheet - Log All Requests", "type": "main", "index": 0 },
+        { "node": "Respond to Frontend", "type": "main", "index": 0 }
+      ]]
+    },
+    "Sheet - Log All Requests": {
+      "main": [[{ "node": "Email - Director of Operations", "type": "main", "index": 0 }]]
+    },
+    "Webhook - Approval Action": {
+      "main": [[{ "node": "Declined?", "type": "main", "index": 0 }]]
+    },
+    "Declined?": {
+      "main": [
+        [{ "node": "Email - Declined Notice to Submitter", "type": "main", "index": 0 }],
+        [{ "node": "Which Stage?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email - Declined Notice to Submitter": {
+      "main": [[{ "node": "Sheet - Update Status Declined", "type": "main", "index": 0 }]]
+    },
+    "Sheet - Update Status Declined": {
+      "main": [[{ "node": "Respond - Declined", "type": "main", "index": 0 }]]
+    },
+    "Which Stage?": {
+      "main": [
+        [{ "node": "Email - Principal", "type": "main", "index": 0 }],
+        [{ "node": "Principal Stage?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email - Principal": {
+      "main": [[{ "node": "Respond - Approved", "type": "main", "index": 0 }]]
+    },
+    "Principal Stage?": {
+      "main": [
+        [{ "node": "Sheet - Get PO Row", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Sheet - Get PO Row": {
+      "main": [[{ "node": "Personal Funds?", "type": "main", "index": 0 }]]
+    },
+    "Personal Funds?": {
+      "main": [
+        [
+          { "node": "Email - Personal Funds Approval to Submitter", "type": "main", "index": 0 },
+          { "node": "Sheet - Update Status Reimbursement", "type": "main", "index": 0 }
+        ],
+        [{ "node": "Email - Accounts Payable", "type": "main", "index": 0 }]
+      ]
+    },
+    "Email - Accounts Payable": {
+      "main": [[{ "node": "Respond - Approved", "type": "main", "index": 0 }]]
+    },
+    "Webhook - Order Placed": {
+      "main": [[{ "node": "Sheet - Get PO Row For Order", "type": "main", "index": 0 }]]
+    },
+    "Sheet - Get PO Row For Order": {
+      "main": [[{ "node": "Sheet - Add to Active Orders", "type": "main", "index": 0 }]]
+    },
+    "Sheet - Add to Active Orders": {
+      "main": [[{ "node": "Sheet - Update All Requests Ordered", "type": "main", "index": 0 }]]
+    },
+    "Sheet - Update All Requests Ordered": {
+      "main": [[
+        { "node": "Email - Order Placed Confirmation to Submitter", "type": "main", "index": 0 },
+        { "node": "Respond - Order Placed", "type": "main", "index": 0 }
+      ]]
+    },
+    "Schedule - Check Received": {
+      "main": [[{ "node": "Sheet - Get Received Orders", "type": "main", "index": 0 }]]
+    },
+    "Sheet - Get Received Orders": {
+      "main": [[{ "node": "Any Received?", "type": "main", "index": 0 }]]
+    },
+    "Any Received?": {
+      "main": [
+        [{ "node": "Sheet - Move to Completed", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Sheet - Move to Completed": {
+      "main": [[{ "node": "Sheet - Delete from Active Orders", "type": "main", "index": 0 }]]
+    }
+  },
   "active": false,
-  "settings": {},
-  "tags": [],
-  "__comment": "Placeholder — workflow will be built in n8n and exported here. Three stages: Department Head → Principal → Finance."
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
 }
