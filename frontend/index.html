@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>St. Mary's Academy — Purchase Order Request</title>
 
+  <!-- Tom Select (searchable dropdowns) -->
+  <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
@@ -185,6 +189,59 @@
       line-height: 1.5;
     }
     .personal-funds-alert strong { font-size: 12px; display: block; margin-bottom: 2px; }
+
+    /* ── Split-accounts checkbox ────────────────────────────────── */
+    .split-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #374151;
+      font-weight: 500;
+    }
+    .split-row input[type=checkbox] {
+      width: 16px; height: 16px; accent-color: #1a2e5a; cursor: pointer; flex-shrink: 0;
+    }
+    .split-row label { cursor: pointer; }
+
+    /* ── Tom Select overrides (match form field style) ───────────── */
+    .ts-wrapper { font-size: 14px; }
+    .ts-wrapper.single .ts-control {
+      border: 1px solid #d1d5db !important;
+      border-radius: 6px !important;
+      padding: 7px 10px !important;
+      box-shadow: none !important;
+      background: #fff !important;
+      color: #1a1a2e;
+      min-height: unset !important;
+    }
+    .ts-wrapper.single.focus .ts-control,
+    .ts-wrapper.single:focus-within .ts-control {
+      border-color: #1a2e5a !important;
+      box-shadow: 0 0 0 3px rgba(26,46,90,.08) !important;
+    }
+    .ts-wrapper.disabled .ts-control {
+      background: #f9fafb !important;
+      color: #6b7280 !important;
+      cursor: not-allowed;
+    }
+    .ts-dropdown {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      font-size: 13px;
+      z-index: 9999;
+    }
+    .ts-dropdown .option { padding: 7px 10px; color: #1a1a2e; }
+    .ts-dropdown .option:hover,
+    .ts-dropdown .option.active { background: #f0f4ff; color: #1a2e5a; }
+    .ts-dropdown .highlight { background: transparent; font-weight: 600; }
+    /* Smaller style for in-table account selects */
+    table.items td .ts-wrapper.single .ts-control {
+      padding: 5px 8px !important;
+      font-size: 12px !important;
+    }
 
     /* ── Line items ─────────────────────────────────────────────── */
     .items-table-wrap { overflow-x: auto; }
@@ -414,7 +471,7 @@
             <label>Date Needed <span class="req">*</span></label>
             <input type="date" id="date-needed" required />
           </div>
-          <div class="field">
+          <div class="field" id="account-field">
             <label>Account Name & # <span class="req">*</span></label>
             <select id="account-code" required disabled>
               <option value="">— select department first —</option>
@@ -441,6 +498,11 @@
     <div class="card">
       <div class="card-header">Items</div>
       <div class="card-body">
+        <div class="split-row">
+          <input type="checkbox" id="split-accounts" onchange="toggleSplitMode()" />
+          <label for="split-accounts">Split charges across multiple accounts</label>
+        </div>
+
         <div class="items-table-wrap">
           <table class="items">
             <thead>
@@ -449,6 +511,7 @@
                 <th class="qty">Qty <span class="req">*</span></th>
                 <th class="itemno">Item #</th>
                 <th>Description <span class="req">*</span></th>
+                <th class="acct-col" style="display:none;min-width:200px;">Account <span class="req">*</span></th>
                 <th class="uprice">Unit Price</th>
                 <th class="eprice">Ext. Price</th>
                 <th>Purchase URL</th>
@@ -479,7 +542,7 @@
       <div class="card-body">
         <div class="field" style="margin-bottom:16px;">
           <label>Vendor <span class="req">*</span></label>
-          <select id="vendor-select" onchange="onVendorSelect()">
+          <select id="vendor-select">
             <option value="">— select vendor —</option>
             <option value="__other__">Other (enter manually)</option>
           </select>
@@ -558,6 +621,11 @@
   /* ── Auth state ─────────────────────────────────────────────────── */
   let currentUser = null;
   let idToken     = null;
+
+  /* ── Split mode & Tom Select instances ──────────────────────────── */
+  let splitMode = false;
+  let accountTS = null;
+  let vendorTS  = null;
 
   function parseJwt(token) {
     try {
@@ -639,12 +707,18 @@
       <td><input type="number" class="num-in qty-in" min="0" step="any" placeholder="0" oninput="recalcRow(this)" data-row="${idx}" /></td>
       <td><input type="text" placeholder="SKU / part #" /></td>
       <td><input type="text" class="desc-in" placeholder="Item description" data-row="${idx}" /></td>
+      <td class="acct-col" style="display:none;"><select class="item-acct-sel"></select></td>
       <td><input type="number" class="num-in price-in" min="0" step="0.01" placeholder="0.00" oninput="recalcRow(this)" data-row="${idx}" /></td>
       <td><input type="text" class="num-in ext-in" readonly placeholder="0.00" data-row="${idx}" /></td>
       <td><input type="url" class="url-in" placeholder="https://" /></td>
       <td><button type="button" class="btn-remove" title="Remove row" onclick="removeItem(this)">✕</button></td>
     `;
     tbody.appendChild(tr);
+    if (splitMode) {
+      const acctCell = tr.querySelector('.acct-col');
+      acctCell.style.display = 'table-cell';
+      initItemAccountTS(tr.querySelector('.item-acct-sel'));
+    }
     updateItemNumbers();
     updateAddBtn();
   }
@@ -698,9 +772,12 @@
       const uPrice  = parseFloat(cells[3].value) || 0;
       const extP    = parseFloat(cells[4].value) || 0;
       const url     = cells[5].value.trim();
+      const acctSel  = tr.querySelector('.item-acct-sel');
+      const itemAcct = acctSel ? acctSel.value : '';
       if (qty > 0 || desc) {
         lineItems.push({ quantity: qty, itemNumber: itemNo, description: desc,
-                         unitPrice: uPrice, extPrice: extP, purchaseUrl: url });
+                         unitPrice: uPrice, extPrice: extP, purchaseUrl: url,
+                         ...(splitMode && { accountCode: itemAcct }) });
       }
     });
 
@@ -714,7 +791,8 @@
       dateRequested:  document.getElementById('date-requested').value,
       dateNeeded:     document.getElementById('date-needed').value,
       purpose:        document.getElementById('purpose').value.trim(),
-      accountCode:    document.getElementById('account-code').value,
+      accountCode:    splitMode ? '' : document.getElementById('account-code').value,
+      splitAccounts:  splitMode,
       personalFunds:  document.getElementById('personal-funds').checked,
       totalCost:      parseFloat(totalText) || 0,
       lineItems,
@@ -735,13 +813,14 @@
     if (!payload.department)  return 'Department is required.';
     if (!payload.purpose)     return 'Purpose of Request is required.';
     if (!payload.dateNeeded)  return 'Date Needed is required.';
-    if (!payload.accountCode) return 'Account Name & # is required.';
+    if (!splitMode && !payload.accountCode) return 'Account Name & # is required.';
     if (!document.getElementById('vendor-select').value) return 'Please select a vendor.';
     if (!payload.vendor.name) return 'Vendor name is required.';
     if (!payload.lineItems.length) return 'At least one line item with a quantity and description is required.';
     for (const [i, item] of payload.lineItems.entries()) {
       if (!item.description) return `Row ${i + 1}: Description is required.`;
       if (item.quantity <= 0) return `Row ${i + 1}: Quantity must be greater than zero.`;
+      if (splitMode && !item.accountCode) return `Row ${i + 1}: Account is required when splitting charges.`;
     }
     return null;
   }
@@ -798,6 +877,19 @@
     itemCount = 0;
     recalcTotal();
     updateAddBtn();
+
+    // Reset split mode
+    splitMode = false;
+    document.querySelectorAll('.acct-col').forEach(el => el.style.display = 'none');
+    document.getElementById('account-field').style.display = '';
+
+    // Sync Tom Select instances after form reset
+    if (accountTS) { accountTS.destroy(); accountTS = null; }
+    const acctSel = document.getElementById('account-code');
+    acctSel.innerHTML = '<option value="">— select department first —</option>';
+    acctSel.disabled  = true;
+    if (vendorTS) { vendorTS.clear(true); }
+
     document.getElementById('vendor-details').style.display = 'none';
     setVendorFieldsReadonly(false);
     document.getElementById('success-screen').style.display = 'none';
@@ -847,6 +939,12 @@
     } catch (e) {
       console.warn('Could not load vendor list:', e);
     }
+
+    vendorTS = new TomSelect('#vendor-select', {
+      placeholder: '— select vendor —',
+      maxOptions: null,
+      onChange: function() { onVendorSelect(); },
+    });
   }
 
   function onVendorSelect() {
@@ -1196,9 +1294,51 @@
     ],
   };
 
+  const ALL_ACCOUNTS = Object.values(DEPT_ACCOUNTS).flat();
+
+  /* ── Split-accounts toggle ──────────────────────────────────────── */
+  function toggleSplitMode() {
+    splitMode = document.getElementById('split-accounts').checked;
+
+    document.querySelectorAll('.acct-col').forEach(el => {
+      el.style.display = splitMode ? 'table-cell' : 'none';
+    });
+    document.getElementById('account-field').style.display = splitMode ? 'none' : '';
+
+    if (splitMode) {
+      document.querySelectorAll('.item-acct-sel').forEach(sel => {
+        if (!sel.tomselect) initItemAccountTS(sel);
+      });
+    } else {
+      document.querySelectorAll('.item-acct-sel').forEach(sel => {
+        if (sel.tomselect) { sel.tomselect.destroy(); sel.innerHTML = ''; }
+      });
+    }
+  }
+
+  function initItemAccountTS(sel) {
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '— select account —';
+    sel.appendChild(placeholder);
+    ALL_ACCOUNTS.forEach(acc => {
+      const opt = document.createElement('option');
+      opt.value = acc;
+      opt.textContent = acc;
+      sel.appendChild(opt);
+    });
+    new TomSelect(sel, {
+      dropdownParent: 'body',
+      placeholder: '— select account —',
+      maxOptions: null,
+    });
+  }
+
   function populateAccounts() {
-    const dept    = document.getElementById('department').value;
-    const select  = document.getElementById('account-code');
+    const dept   = document.getElementById('department').value;
+    const select = document.getElementById('account-code');
+
+    if (accountTS) { accountTS.destroy(); accountTS = null; }
     select.innerHTML = '';
 
     if (!dept || !DEPT_ACCOUNTS[dept]) {
@@ -1220,6 +1360,10 @@
     });
 
     select.disabled = false;
+    accountTS = new TomSelect('#account-code', {
+      placeholder: '— select account —',
+      maxOptions: null,
+    });
   }
 
   /* ── Init ───────────────────────────────────────────────────────── */
