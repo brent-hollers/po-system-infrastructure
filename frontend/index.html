@@ -418,6 +418,23 @@
     }
     .btn-invoice-remove:hover { background: #fef2f2; }
     .upload-hint { font-size: 11px; color: #9ca3af; margin-top: 8px; }
+
+    /* ── Generate PO checkbox ───────────────────────────────────── */
+    .generate-po-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 14px 16px;
+      background: #f0f4ff;
+      border: 1px solid #93b4f0;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+    .generate-po-row input[type=checkbox] {
+      width: 18px; height: 18px; accent-color: #1a2e5a; cursor: pointer; flex-shrink: 0; margin-top: 2px;
+    }
+    .generate-po-row label { font-size: 13px; color: #1a2e5a; cursor: pointer; line-height: 1.4; }
+    .generate-po-row label strong { display: block; font-size: 14px; color: #1a2e5a; margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -616,6 +633,13 @@
               <input type="text" id="vendor-email" />
             </div>
           </div>
+        </div>
+        <div class="generate-po-row">
+          <input type="checkbox" id="generate-po" />
+          <label for="generate-po">
+            <strong>Generate a Purchase Order Document</strong>
+            Check this box if the vendor requires a formal PO. A Purchase Order document will be generated and emailed to you upon approval.
+          </label>
         </div>
       </div>
     </div>
@@ -847,6 +871,7 @@
       accountCode:    splitMode ? '' : document.getElementById('account-code').value,
       splitAccounts:  splitMode,
       personalFunds:  document.getElementById('personal-funds').checked,
+      generatePO:     document.getElementById('generate-po').checked,
       invoice:        invoiceFile ? {
         name:     invoiceFile.name,
         type:     invoiceFile.type,
