@@ -384,6 +384,40 @@
     #success-screen p { color: #666; margin-bottom: 24px; }
     .btn-new { background: #1a2e5a; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; }
     .btn-new:hover { background: #243e78; }
+
+    /* ── Invoice upload ─────────────────────────────────────────── */
+    .upload-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .btn-upload {
+      background: #f0f4ff;
+      border: 1px dashed #93b4f0;
+      color: #1a2e5a;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: background .15s;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .btn-upload:hover { background: #dce8ff; }
+    .invoice-info { font-size: 13px; color: #374151; font-weight: 500; }
+    .btn-invoice-remove {
+      background: none;
+      border: 1px solid #fca5a5;
+      color: #dc2626;
+      padding: 4px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btn-invoice-remove:hover { background: #fef2f2; }
+    .upload-hint { font-size: 11px; color: #9ca3af; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -586,6 +620,20 @@
       </div>
     </div>
 
+    <!-- Invoice upload ──────────────────────────────────────────── -->
+    <div class="card">
+      <div class="card-header">Invoice / Receipt</div>
+      <div class="card-body">
+        <div class="upload-row">
+          <label class="btn-upload" for="invoice-input">&#128206; Attach Invoice or Receipt</label>
+          <input type="file" id="invoice-input" accept=".pdf,.jpg,.jpeg,.png,.webp" onchange="handleInvoiceSelect(this)" style="display:none;" />
+          <span id="invoice-info" class="invoice-info"></span>
+          <button type="button" id="invoice-remove" class="btn-invoice-remove" onclick="removeInvoice()" style="display:none;">✕ Remove</button>
+        </div>
+        <p class="upload-hint">Optional &mdash; PDF, JPG, or PNG &middot; Max 10 MB</p>
+      </div>
+    </div>
+
     <!-- Submit ───────────────────────────────────────────────────── -->
     <div class="notice error" id="form-error"></div>
     <div class="submit-row">
@@ -615,7 +663,9 @@
     webhookUrl:     'https://api.purchases.smaschool.org/webhook/po-submit',
     allowedDomain:  'smaschool.org',
     maxItems:       10,
-    vendorCsvUrl:   'https://docs.google.com/spreadsheets/d/e/2PACX-1vR3-affSTPMy7laCX6lqb9sbyYRP4Ekm3pgALX3LYhXpttSWKy_x5cKZ6iUvYzLTg5JL0hF-4aI-JZW/pub?gid=0&single=true&output=csv',
+    vendorCsvUrl:      'https://docs.google.com/spreadsheets/d/e/2PACX-1vR3-affSTPMy7laCX6lqb9sbyYRP4Ekm3pgALX3LYhXpttSWKy_x5cKZ6iUvYzLTg5JL0hF-4aI-JZW/pub?gid=0&single=true&output=csv',
+    invoiceFolderId:   '16d1LkdUSzXvfyB3TEftEYySFnSjhTnBz',
+    maxInvoiceSizeBytes: 10 * 1024 * 1024,
   };
 
   /* ── Auth state ─────────────────────────────────────────────────── */
@@ -626,6 +676,9 @@
   let splitMode = false;
   let accountTS = null;
   let vendorTS  = null;
+
+  /* ── Invoice upload ─────────────────────────────────────────────── */
+  let invoiceFile = null;
 
   function parseJwt(token) {
     try {
@@ -794,6 +847,12 @@
       accountCode:    splitMode ? '' : document.getElementById('account-code').value,
       splitAccounts:  splitMode,
       personalFunds:  document.getElementById('personal-funds').checked,
+      invoice:        invoiceFile ? {
+        name:     invoiceFile.name,
+        type:     invoiceFile.type,
+        data:     invoiceFile.data,
+        folderId: CONFIG.invoiceFolderId,
+      } : null,
       totalCost:      parseFloat(totalText) || 0,
       lineItems,
       vendor: {
@@ -890,6 +949,10 @@
     acctSel.disabled  = true;
     if (vendorTS) { vendorTS.clear(true); }
 
+    invoiceFile = null;
+    document.getElementById('invoice-input').value = '';
+    updateInvoiceUI();
+
     document.getElementById('vendor-details').style.display = 'none';
     setVendorFieldsReadonly(false);
     document.getElementById('success-screen').style.display = 'none';
@@ -897,6 +960,49 @@
     document.getElementById('form-error').style.display      = 'none';
     addItem();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── Invoice upload ─────────────────────────────────────────────── */
+  function handleInvoiceSelect(input) {
+    const file = input.files[0];
+    if (!file) { invoiceFile = null; updateInvoiceUI(); return; }
+
+    if (file.size > CONFIG.maxInvoiceSizeBytes) {
+      alert('File is too large. Please attach a file under 10 MB.');
+      input.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      invoiceFile = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        data: e.target.result.split(',')[1], // base64 only, strip data URL prefix
+      };
+      updateInvoiceUI();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeInvoice() {
+    invoiceFile = null;
+    document.getElementById('invoice-input').value = '';
+    updateInvoiceUI();
+  }
+
+  function updateInvoiceUI() {
+    const info      = document.getElementById('invoice-info');
+    const removeBtn = document.getElementById('invoice-remove');
+    if (invoiceFile) {
+      const kb = (invoiceFile.size / 1024).toFixed(1);
+      info.textContent       = invoiceFile.name + ' (' + kb + ' KB)';
+      removeBtn.style.display = 'inline-block';
+    } else {
+      info.textContent       = '';
+      removeBtn.style.display = 'none';
+    }
   }
 
   /* ── Vendors ────────────────────────────────────────────────────── */
