@@ -1,0 +1,11 @@
+name: TruffleHog Scan
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  run-shared-scan:
+    uses: brent-hollers/devops-toolkit/.github/workflows/trufflehog-template.yml@master
