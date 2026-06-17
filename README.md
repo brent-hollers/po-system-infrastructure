@@ -20,6 +20,4 @@ Infrastructure-as-code for the St. Mary's Academy PO Management System.
 
 See [PROJECT_STRUCTURE.MD](PROJECT_STRUCTURE.MD) for a full breakdown.
 
-## Getting Started
-
-> Requirements and setup instructions to be documented as infrastructure is built.
+## More details coming soon!
