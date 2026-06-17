@@ -1,0 +1,10 @@
+# backend.tf.example
+# Copy to backend.tf and fill in your values
+terraform {
+  backend "s3" {
+    bucket         = "your-tfstate-bucket-name"
+    key            = "po-system/terraform.tfstate"
+    region         = "us-east-1"
+    encrypt        = true
+  }
+}

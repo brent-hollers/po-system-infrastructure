@@ -24,3 +24,15 @@ Thumbs.db
 # Environment
 .env
 *.env.local
+
+workflows/po-approval-workflow.json
+
+*.xls
+
+*.xlsx
+
+.claude/
+
+infrastructure/backend.tf
+
+infrastructure/bootstrap/main.tf
