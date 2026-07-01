@@ -697,7 +697,7 @@
           <span id="invoice-info" class="invoice-info"></span>
           <button type="button" id="invoice-remove" class="btn-invoice-remove" onclick="removeInvoice()" style="display:none;">✕ Remove</button>
         </div>
-        <p class="upload-hint">Optional &mdash; PDF, JPG, or PNG &middot; Max 10 MB</p>
+        <p class="upload-hint" id="invoice-hint">Optional &mdash; PDF, JPG, or PNG &middot; Max 10 MB</p>
       </div>
     </div>
 
@@ -953,6 +953,9 @@
       if (!item.description) return `Row ${i + 1}: Description is required.`;
       if (item.quantity <= 0) return `Row ${i + 1}: Quantity must be greater than zero.`;
       if (splitMode && !item.accountCode) return `Row ${i + 1}: Account is required when splitting charges.`;
+    if (document.getElementById('personal-funds').checked && !invoiceFile) {
+      return 'A receipt is required for personal funds reimbursement requests.';
+}
     }
     return null;
   }
@@ -1548,6 +1551,16 @@
   /* ── Init ───────────────────────────────────────────────────────── */
   addItem();
   loadVendors();
+
+  //Personal funds receipt requirement
+  document.getElementById('personal-funds').addEventListener('change', function() {
+  const hint = document.getElementById('invoice-hint');
+  if (this.checked) {
+    hint.innerHTML = '<strong style="color:#dc2626;">Receipt required for reimbursement requests</strong> &mdash; PDF, JPG, or PNG &middot; Max 10 MB';
+  } else {
+    hint.innerHTML = 'Optional &mdash; PDF, JPG, or PNG &middot; Max 10 MB';
+  }
+});
 </script>
 
 </body>
